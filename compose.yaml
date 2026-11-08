@@ -1,0 +1,172 @@
+name: iot-fog-cloud
+
+services:
+  camera_a1:
+    build: ./camera
+    image: iot-camera:latest
+    environment:
+      CAMERA_ID: camera_a1
+      ZONE: zone_a
+      FOG_URL: http://172.28.1.10:8000
+    networks:
+      - zone_a_net
+    restart: unless-stopped
+    depends_on:
+      fog_a:
+        condition: service_started
+
+  camera_a2:
+    build: ./camera
+    image: iot-camera:latest
+    environment:
+      CAMERA_ID: camera_a2
+      ZONE: zone_a
+      FOG_URL: http://172.28.1.10:8000
+    networks:
+      - zone_a_net
+    restart: unless-stopped
+    depends_on:
+      fog_a:
+        condition: service_started
+
+  camera_b1:
+    build: ./camera
+    image: iot-camera:latest
+    environment:
+      CAMERA_ID: camera_b1
+      ZONE: zone_b
+      FOG_URL: http://172.28.2.10:8000
+    networks:
+      - zone_b_net
+    restart: unless-stopped
+    depends_on:
+      fog_b:
+        condition: service_started
+
+  fog_a:
+    build: ./fog
+    image: iot-fog:latest
+    environment:
+      FOG_ID: fog_a
+      ZONE: zone_a
+      NETEM_DELAY: ${NETEM_DELAY:-50ms}
+      LOG_COLLECTOR_URL: http://172.28.4.30:9000/logs
+    cpus: ${FOG_CPU_LIMIT:-0.5}
+    mem_limit: ${FOG_MEM_LIMIT:-256m}
+    cap_add:
+      - NET_ADMIN
+    networks:
+      zone_a_net:
+        ipv4_address: 172.28.1.10
+      backbone_net:
+        ipv4_address: 172.28.3.10
+      mgmt_net:
+        ipv4_address: 172.28.4.10
+    restart: unless-stopped
+    depends_on:
+      monitoring:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  fog_b:
+    build: ./fog
+    image: iot-fog:latest
+    environment:
+      FOG_ID: fog_b
+      ZONE: zone_b
+      NETEM_DELAY: ${NETEM_DELAY:-50ms}
+      LOG_COLLECTOR_URL: http://172.28.4.30:9000/logs
+    cpus: ${FOG_CPU_LIMIT:-0.5}
+    mem_limit: ${FOG_MEM_LIMIT:-256m}
+    cap_add:
+      - NET_ADMIN
+    networks:
+      zone_b_net:
+        ipv4_address: 172.28.2.10
+      backbone_net:
+        ipv4_address: 172.28.3.11
+      mgmt_net:
+        ipv4_address: 172.28.4.11
+    restart: unless-stopped
+    depends_on:
+      monitoring:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  cloud:
+    build: ./cloud
+    image: iot-cloud:latest
+    environment:
+      CLOUD_ID: cloud
+      NETEM_DELAY: ${NETEM_DELAY:-50ms}
+      LOG_COLLECTOR_URL: http://172.28.4.30:9000/logs
+    cap_add:
+      - NET_ADMIN
+    networks:
+      backbone_net:
+        ipv4_address: 172.28.3.20
+      mgmt_net:
+        ipv4_address: 172.28.4.20
+    restart: unless-stopped
+    depends_on:
+      monitoring:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  monitoring:
+    build: ./monitoring
+    image: iot-monitoring:latest
+    environment:
+      LOG_DIR: /logs
+    ports:
+      - "9000:9000"
+    volumes:
+      - monitoring_logs:/logs
+    networks:
+      mgmt_net:
+        ipv4_address: 172.28.4.30
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  zone_a_net:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.1.0/24
+
+  zone_b_net:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.2.0/24
+
+  backbone_net:
+    ipam:
+      config:
+        - subnet: 172.28.3.0/24
+
+  mgmt_net:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.4.0/24
+
+volumes:
+  monitoring_logs:
