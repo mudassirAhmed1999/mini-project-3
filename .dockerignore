@@ -1,0 +1,7 @@
+.git
+.vscode
+report
+experiments
+**/__pycache__
+*.md
+.env

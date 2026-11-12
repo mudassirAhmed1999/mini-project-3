@@ -13,7 +13,12 @@ services:
     restart: unless-stopped
     depends_on:
       fog_a:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf $${FOG_URL}/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   camera_a2:
     build: ./camera
@@ -27,7 +32,12 @@ services:
     restart: unless-stopped
     depends_on:
       fog_a:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf $${FOG_URL}/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   camera_b1:
     build: ./camera
@@ -41,10 +51,17 @@ services:
     restart: unless-stopped
     depends_on:
       fog_b:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf $${FOG_URL}/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   fog_a:
-    build: ./fog
+    build:
+      context: .
+      dockerfile: fog/Dockerfile
     image: iot-fog:latest
     environment:
       FOG_ID: fog_a
@@ -73,7 +90,9 @@ services:
       retries: 5
 
   fog_b:
-    build: ./fog
+    build:
+      context: .
+      dockerfile: fog/Dockerfile
     image: iot-fog:latest
     environment:
       FOG_ID: fog_b
@@ -102,7 +121,9 @@ services:
       retries: 5
 
   cloud:
-    build: ./cloud
+    build:
+      context: .
+      dockerfile: cloud/Dockerfile
     image: iot-cloud:latest
     environment:
       CLOUD_ID: cloud
@@ -130,8 +151,6 @@ services:
     image: iot-monitoring:latest
     environment:
       LOG_DIR: /logs
-    ports:
-      - "9000:9000"
     volumes:
       - monitoring_logs:/logs
     networks:
