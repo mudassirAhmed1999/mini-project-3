@@ -5,8 +5,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-#copies camera application into the container
-COPY app.py . 
+# copies the monitoring application into the container
+COPY app.py .
 
 EXPOSE 9000
 
